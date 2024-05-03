@@ -1,0 +1,12 @@
+.idea/
+env/
+venv/
+logs/
+dbt-logs/
+dags/dbt/target/
+dags/dbt/compiles
+*.pyc
+config.properties
+.DS_store
+__pycache__/
+.env
