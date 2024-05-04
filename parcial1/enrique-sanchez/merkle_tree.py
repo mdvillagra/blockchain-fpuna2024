@@ -1,4 +1,3 @@
-from itertools import product, permutations
 
 import poseidon
 
