@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Splitwise",
+  "sourceName": "contracts/mycontract.sol",
+  "abi": ["0x5FbDB2315678afecb367f032d93F642f64180aa3"],
+  "bytecode": "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220970dd03615f9847aab382be821afdb5c2682fb90ad0eabcb82940df256508e8e64736f6c63430008110033",
+  "deployedBytecode": "0x6080604052600080fdfea2646970667358221220970dd03615f9847aab382be821afdb5c2682fb90ad0eabcb82940df256508e8e64736f6c63430008110033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
