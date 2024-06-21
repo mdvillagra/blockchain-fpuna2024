@@ -1,0 +1,1 @@
+Colocar aquí los trabajos correspodientes al parcial 2. Crea una carpeta con tu nombre y el de tu compañero de grupo.
