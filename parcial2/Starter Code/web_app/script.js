@@ -9,12 +9,79 @@ var GENESIS = '0x000000000000000000000000000000000000000000000000000000000000000
 
 // This is the ABI for your contract (get it from Remix, in the 'Compile' tab)
 // ============================================================
-var abi = []; // FIXME: fill this in with your contract's ABI //Be sure to only have one array, not two
+var abi = [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "creditor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32",
+          "name": "amount",
+          "type": "uint32"
+        }
+      ],
+      "name": "add_IOU",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "debts",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "amount",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "debtor",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "creditor",
+          "type": "address"
+        }
+      ],
+      "name": "lookup",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]; // FIXME: fill this in with your contract's ABI //Be sure to only have one array, not two
 // ============================================================
 abiDecoder.addABI(abi);
 // call abiDecoder.decodeMethod to use this - see 'getAllFunctionCalls' for more
 
-var contractAddress = ""; // FIXME: fill this in with your contract's address/hash
+var contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // FIXME: fill this in with your contract's address/hash
 
 var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.getSigner());
 
@@ -24,29 +91,92 @@ var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.get
 
 // TODO: Add any helper functions here!
 
+// Helper function to get all unique users from the function calls
+async function getAllUsersFromFunctionCalls(functionName) {
+    let functionCalls = await getAllFunctionCalls(contractAddress, functionName);
+    let users = new Set();
+    for (let call of functionCalls) {
+        users.add(call.from);
+        for (let arg of call.args) {
+            users.add(arg);
+        }
+    }
+    return Array.from(users);
+}
+
 // TODO: Return a list of all users (creditors or debtors) in the system
 // All users in the system are everyone who has ever sent or received an IOU
 async function getUsers() {
-
+    let users = await getAllUsersFromFunctionCalls('add_IOU');
+    return users;
 }
 
 // TODO: Get the total amount owed by the user specified by 'user'
 async function getTotalOwed(user) {
+    let users = await getUsers();
+    let totalOwed = ethers.BigNumber.from(0);
 
+    for (let u of users) {
+        if (u.toLowerCase() !== user.toLowerCase()) {
+            let amount = await BlockchainSplitwise.lookup(user, u);
+            totalOwed = totalOwed.add(amount);
+			console.log( u + " -> "+totalOwed )
+
+        }
+    }
+    return totalOwed.toString();
 }
 
 // TODO: Get the last time this user has sent or received an IOU, in seconds since Jan. 1, 1970
 // Return null if you can't find any activity for the user.
 // HINT: Try looking at the way 'getAllFunctionCalls' is written. You can modify it if you'd like.
 async function getLastActive(user) {
-	
-}
+    let functionCalls = await getAllFunctionCalls(contractAddress, 'add_IOU');
+    let lastActive = null;
 
+    for (let call of functionCalls) {
+        if (call.from.toLowerCase() === user.toLowerCase() || call.args.includes(user.toLowerCase())) {
+            if (lastActive === null || call.t > lastActive) {
+                lastActive = call.t;
+            }
+        }
+    }
+    return lastActive;
+}
 // TODO: add an IOU ('I owe you') to the system
 // The person you owe money is passed as 'creditor'
 // The amount you owe them is passed as 'amount'
 async function add_IOU(creditor, amount) {
-	
+    let signer = provider.getSigner();
+    let currentAddress = await signer.getAddress();
+
+    // Check if there's a direct path between debtor and creditor
+    let getNeighbors = async (node) => {
+        let users = await getUsers();
+        let neighbors = [];
+        for (let u of users) {
+            let amount = await BlockchainSplitwise.lookup(node, u);
+            if (amount.gt(0)) {
+                neighbors.push(u);
+            }
+        }
+        return neighbors;
+    };
+
+    let path = await doBFS(currentAddress, creditor, getNeighbors);
+    let totalAmount = ethers.BigNumber.from(amount);
+
+    if (path !== null) {
+        // Adjust amounts along the cycle
+        for (let i = 0; i < path.length - 1; i++) {
+            let debtor = path[i];
+            let creditor = path[i + 1];
+            let currentDebt = await BlockchainSplitwise.lookup(debtor, creditor);
+            totalAmount = totalAmount.add(currentDebt);
+        }
+    }
+	console.log("Agregando...")
+    await BlockchainSplitwise.connect(signer).add_IOU(creditor, totalAmount.toString());
 }
 
 // =============================================================================
@@ -108,6 +238,8 @@ async function doBFS(start, end, getNeighbors) {
 	return null;
 }
 
+
+
 // =============================================================================
 //                                      UI
 // =============================================================================
@@ -143,7 +275,8 @@ $("#myaccount").change(function() {
 
 // Allows switching between accounts in 'My Account' and the 'fast-copy' in 'Address of person you owe
 provider.listAccounts().then((response)=>{
-	var opts = response.map(function (a) { return '<option value="'+
+	var opts = response.map(function (a) { 
+		return '<option value="'+
 			a.toLowerCase()+'">'+a.toLowerCase()+'</option>' });
 	$(".account").html(opts);
 	$(".wallet_addresses").html(response.map(function (a) { return '<li>'+a.toLowerCase()+'</li>' }));
@@ -151,7 +284,7 @@ provider.listAccounts().then((response)=>{
 
 // This code updates the 'Users' list in the UI with the results of your function
 getUsers().then((response)=>{
-	$("#all_users").html(response.map(function (u,i) { return "<li>"+u+"</li>" }));
+	$("#all_users").html(response.map(function (u) { return "<li>"+u+"</li>" }));
 });
 
 // This runs the 'add_IOU' function when you click the button

@@ -1,65 +1,41 @@
-// SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.17;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-contract SplitWise {
-    mapping(address => mapping(address => uint32)) private debts;
-    mapping(address => bool) private visited;
+contract Splitwise {
+    // Estructura para almacenar la deuda entre dos direcciones
+    struct Debt {
+        uint32 amount;
+    }
 
+    // Mapeo de deudor a acreedor y su deuda correspondiente
+    mapping(address => mapping(address => Debt)) public debts;
+
+    // Evento para registrar la adición de una deuda
+    event IOUAdded(address indexed debtor, address indexed creditor, uint32 amount);
+
+    // Función para consultar la deuda entre dos direcciones
+    function lookup(address debtor, address creditor) public view returns (uint32) {
+        return debts[debtor][creditor].amount;
+    }
+
+    // Función para añadir una cantidad a la deuda
     function add_IOU(address creditor, uint32 amount) public {
-        require(amount > 0, "Amount must be positive");
-        require(!hasCycle(msg.sender, creditor), "Cycle detected");
-        debts[msg.sender][creditor] += amount;
+        require(amount > 0, "El monto debe ser positivo");
+        debts[msg.sender][creditor].amount += amount;
+
+        // Verificar si se forma un ciclo
+        if (debts[creditor][msg.sender].amount > 0) {
+            uint32 minDebt = min(debts[msg.sender][creditor].amount, debts[creditor][msg.sender].amount);
+            debts[msg.sender][creditor].amount -= minDebt;
+            debts[creditor][msg.sender].amount -= minDebt;
+        }
+
+        // Emitir el evento IOUAdded
         emit IOUAdded(msg.sender, creditor, amount);
     }
 
-    function hasCycle(address debtor, address creditor) private returns (bool) {
-        if (visited[debtor]) {
-            return false;
-        }
-        visited[debtor] = true;
-
-        address[] memory creditors = getCreditors(debtor);
-        for (uint256 i = 0; i < creditors.length; i++) {
-            address nextCreditor = creditors[i];
-            if (nextCreditor == creditor || hasCycle(nextCreditor, creditor)) {
-                return true;
-            }
-        }
-
-        visited[debtor] = false;
-        return false;
+    // Función auxiliar para encontrar el mínimo entre dos números
+    function min(uint32 a, uint32 b) internal pure returns (uint32) {
+        return a < b ? a : b;
     }
-
-function getCreditors(address debtor) public view returns (address[] memory) {
-    address[] memory creditors = new address.v;
-    uint256 numCreditors = 0;
-    for (uint256 i = 0; i < getAllPossibleAddresses().length; i++) {
-        address possibleCreditor = getAllPossibleAddresses()[i];
-        if (debts[debtor][possibleCreditor] > 0) {
-            creditors[numCreditors] = possibleCreditor;
-            numCreditors++;
-        }
-    }
-    address[] memory result = new address;
-    for (uint256 i = 0; i < numCreditors; i++) {
-        result[i] = creditors[i];
-    }
-    return result;
-}
-
-
-
-    function getAllPossibleAddresses() private pure returns (address[] memory) {
-        address[] memory addresses = new address;
-        addresses[0] = address(0x123);
-        addresses[1] = address(0x456);
-        addresses[2] = address(0x789);
-        return addresses;
-    }
-
-    event IOUAdded(
-        address indexed debtor,
-        address indexed creditor,
-        uint32 amount
-    );
 }
