@@ -46,6 +46,11 @@ var abi = [
           "internalType": "uint32",
           "name": "amount",
           "type": "uint32"
+        },
+        {
+          "internalType": "address[]",
+          "name": "cycle",
+          "type": "address[]"
         }
       ],
       "name": "add_IOU",
@@ -101,7 +106,8 @@ var abi = [
       "stateMutability": "view",
       "type": "function"
     }
-  ];
+];
+
 // ============================================================
 abiDecoder.addABI(abi);
 
@@ -145,17 +151,12 @@ async function getUsers() {
 }
 
 async function getTotalOwed(user) {
-    const currentSigner = provider.getSigner(user);
-    const BlockchainSplitwiseWithSigner = BlockchainSplitwise.connect(currentSigner);
-    printInitialDeudor("signerOnTotalOwed");
-    const users = await provider.listAccounts();
+    const users = await getUsers();
     let totalOwed = 0;
     for (const creditor of users) {
         if (user !== creditor) {
-            const amount = await BlockchainSplitwiseWithSigner.lookup(user, creditor);
-            // Convertir amount a número adecuadamente
-            const amountNumber = ethers.BigNumber.from(amount).toNumber();
-            totalOwed += amountNumber;
+            const amount = await lookup(user, creditor);
+            totalOwed += amount;
         }
     }
     return totalOwed;
@@ -176,101 +177,82 @@ async function getLastActive(user) {
 
 // TODO: add an IOU ('I owe you') to the system
 async function add_IOU(creditor, amount) {
-	console.log("IOU");
 
-    const debtor = await signer.getAddress();
-    console.log("deudor" + debtor);
-    const debtGraph = await buildDebtGraph();
-	console.log("Grafo: "+ JSON.stringify(debtGraph));
-    await resolveCycles(debtGraph, debtor, creditor, amount);
-	console.log("Grafo resolved: "+ JSON.stringify(debtGraph));
+    // Detect potential cycle
+    console.log("El que esta adeudando: "+defaultAccount)
+    console.log("Antes de FindCycle")
+    console.log(JSON.stringify(creditor))
+    const cycle = await findCycle(creditor, defaultAccount, amount);
 
-    // Agregar el IOU después de resolver los ciclos
-    const tx = await BlockchainSplitwise.add_IOU(creditor, amount);
+    console.log("cycle" + JSON.stringify(cycle));
+    // Call add_IOU on the smart contract
+    const tx = await BlockchainSplitwise.add_IOU(creditor, amount, cycle);
+
+
     await tx.wait();
 }
+
 
 // =============================================================================
 //                              Utils Functions
 // =============================================================================
 
-// Función para construir el grafo de deudas
-async function buildDebtGraph() {
-    const debtGraph = {};
-    const users = await provider.listAccounts();
-    for (const debtor of users) {
-        debtGraph[debtor] = {};
-        for (const creditor of users) {
-            if (debtor !== creditor) {
-                const amount = await BlockchainSplitwise.lookup(debtor, creditor);
-                if (amount > 0) {
-                    debtGraph[debtor][creditor] = amount;
-                }
-            }
-        }
-    }
-    return debtGraph;
+// Helper function to lookup debt
+async function lookup(debtor, creditor) {
+    console.log("calling Lookup ")
+    const currentSigner = provider.getSigner(debtor);
+    console.log("1")
+
+    const BlockchainSplitwiseWithSigner = BlockchainSplitwise.connect(currentSigner);
+    console.log("2 ")
+
+    const amount = await BlockchainSplitwiseWithSigner.lookup(debtor,creditor);
+    console.log("3")
+
+    return ethers.BigNumber.from(amount).toNumber();
 }
 
-// Función para encontrar y resolver ciclos en el grafo de deudas
-async function resolveCycles(debtGraph, newDebtor, newCreditor, newAmount) {
-    debtGraph[newDebtor][newCreditor] = (debtGraph[newDebtor][newCreditor] || 0) + newAmount;
-
+// Helper function to detect cycles
+async function findCycle(start, end, amount) {
+    const users = await getUsers();
     const visited = new Set();
     const stack = [];
-    const cycles = [];
+    const cycle = [];
 
-    function dfs(node) {
-        if (visited.has(node)) {
-            const cycleIndex = stack.indexOf(node);
-            if (cycleIndex !== -1) {
-                cycles.push([...stack.slice(cycleIndex), node]);
-            }
-            return;
+    async function dfs(current) {
+        if (current === end) {
+            cycle.push(...stack, current);
+            return true;
         }
-        visited.add(node);
-        stack.push(node);
+        visited.add(current);
+        stack.push(current);
 
-        for (const neighbor in debtGraph[node]) {
-            if (debtGraph[node][neighbor] > 0) {
-                dfs(neighbor);
+        for (const user of users) {
+            if (!visited.has(user)) {
+                const debtAmount = await lookup(current, user);
+                if (debtAmount > 0) {
+                    if (await dfs(user)) {
+                        return true;
+                    }
+                }
             }
         }
 
         stack.pop();
+        return false;
     }
 
-    dfs(newDebtor);
-
-    if (cycles.length > 0) {
-        for (const cycle of cycles) {
-            resolveCycle(debtGraph, cycle);
-        }
+    if (await dfs(start)) {
+        return cycle;
     }
-}
 
-// Función para resolver un ciclo específico
-function resolveCycle(debtGraph, cycle) {
-    const cycleAmounts = cycle.map((node, index) => {
-        const nextNode = cycle[(index + 1) % cycle.length];
-        return debtGraph[node][nextNode];
-    });
-
-    const minAmount = Math.min(...cycleAmounts);
-
-    for (let i = 0; i < cycle.length; i++) {
-        const node = cycle[i];
-        const nextNode = cycle[(i + 1) % cycle.length];
-        debtGraph[node][nextNode] -= minAmount;
-        if (debtGraph[node][nextNode] === 0) {
-            delete debtGraph[node][nextNode];
-        }
-    }
+    return [];
 }
 
 // =============================================================================
 //                              Provided Functions
 // =============================================================================
+
 
 async function getAllFunctionCalls(addressOfContract, functionName) {
     var curBlock = await provider.getBlockNumber();
