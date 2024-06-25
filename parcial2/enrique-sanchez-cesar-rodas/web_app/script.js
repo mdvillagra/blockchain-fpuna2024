@@ -212,7 +212,25 @@ async function getTotalOwed(user) {
 // TODO: Get the last time this user has sent or received an IOU, in seconds since Jan. 1, 1970
 // Return null if you can't find any activity for the user.
 // HINT: Try looking at the way 'getAllFunctionCalls' is written. You can modify it if you'd like.
-async function getLastActive(user) {}
+async function getLastActive(user) {
+  const addressOfContract = BlockchainSplitwise.address;
+  const functionName = "addIOU";
+
+  const allFunctionCalls = await getAllFunctionCalls(addressOfContract, functionName);
+
+  let latestTimestamp = null;
+
+  allFunctionCalls.forEach(call => {
+    if (call.args[0].toLowerCase() === user.toLowerCase() || call.from.toLowerCase() === user.toLowerCase()) {
+      if (latestTimestamp === null || call.t > latestTimestamp) {
+        latestTimestamp = call.t;
+      }
+    }
+  });
+
+  return latestTimestamp;
+}
+
 
 // TODO: add an IOU ('I owe you') to the system
 // The person you owe money is passed as 'creditor'
