@@ -115,27 +115,20 @@ var contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 var signer = provider.getSigner();
 
-async function printInitialDeudor(message) { 
-    const siig = await signer.getAddress();
-    console.log(message + " :" + siig);
-}
-printInitialDeudor("initialSigner");
-
 var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, signer);
 
 // =============================================================================
 //                            Functions To Implement
 // =============================================================================
 
-//OK
+
 // Helper function to get all IOU calls
 async function getAllIOUCalls() {
     const iouCalls = await getAllFunctionCalls(contractAddress, "add_IOU");
     return iouCalls;
 }
 
-//OK
-// TODO: Return a list of all users (creditors or debtors) in the system
+// Return a list of all users (creditors or debtors) in the system
 async function getUsers() {
     const iouCalls = await getAllIOUCalls();
     const users = new Set();
@@ -162,7 +155,8 @@ async function getTotalOwed(user) {
     return totalOwed;
 }
 
-// TODO: Get the last time this user has sent or received an IOU, in seconds since Jan. 1, 1970
+
+// Get the last time this user has sent or received an IOU, in seconds since Jan. 1, 1970
 async function getLastActive(user) {
     const iouCalls = await getAllIOUCalls();
     const userCalls = iouCalls.filter(call => call.from === user || call.args[0] === user);
@@ -175,14 +169,11 @@ async function getLastActive(user) {
     return lastCall.t;
 }
 
-// TODO: add an IOU ('I owe you') to the system
+// add an IOU ('I owe you') to the system
 async function add_IOU(creditor, amount) {
 
     // Detect potential cycle
-    console.log("El que esta adeudando: "+defaultAccount)
-    console.log("Antes de FindCycle")
-    console.log(JSON.stringify(creditor))
-    const cycle = await findCycle(creditor, defaultAccount, amount);
+    const cycle = await findCycle(creditor, defaultAccount);
 
     console.log("cycle" + JSON.stringify(cycle));
     // Call add_IOU on the smart contract
@@ -199,21 +190,14 @@ async function add_IOU(creditor, amount) {
 
 // Helper function to lookup debt
 async function lookup(debtor, creditor) {
-    console.log("calling Lookup ")
     const currentSigner = provider.getSigner(debtor);
-    console.log("1")
-
     const BlockchainSplitwiseWithSigner = BlockchainSplitwise.connect(currentSigner);
-    console.log("2 ")
-
     const amount = await BlockchainSplitwiseWithSigner.lookup(debtor,creditor);
-    console.log("3")
-
     return ethers.BigNumber.from(amount).toNumber();
 }
 
 // Helper function to detect cycles
-async function findCycle(start, end, amount) {
+async function findCycle(start, end) {
     const users = await getUsers();
     const visited = new Set();
     const stack = [];
@@ -290,7 +274,6 @@ async function getAllFunctionCalls(addressOfContract, functionName) {
 async function updateSigner(account) {
     signer = provider.getSigner(account);
     BlockchainSplitwise = BlockchainSplitwise.connect(signer);
-    await printInitialDeudor("Updated Signer");
 }
 
 //Carga inicial de la cuenta y su totalOwed
@@ -308,7 +291,7 @@ provider.listAccounts().then((response) => {
     });
 });
 
-//El change de la myaccount
+
 $("#myaccount").change(function () {
     defaultAccount = $(this).val();
     updateSigner(defaultAccount).then(() => {
@@ -323,7 +306,7 @@ $("#myaccount").change(function () {
     });
 });
 
-//Este carga el select y las lista de direcciones
+
 provider.listAccounts().then((response) => {
     const opts = response.map(function (a) { return '<option value="' + a.toLowerCase() + '">' + a.toLowerCase() + '</option>' });
     $(".account").html(opts);
@@ -335,31 +318,15 @@ getUsers().then((response) => {
     $("#all_users").html(response.map(function (u, i) { return "<li>" + u + "</li>" }));
 });
 
-const delay = ms => new Promise(res => setTimeout(res, ms));
 
 
+//const delay = ms => new Promise(res => setTimeout(res, ms));
 //Elemento del boton.
 $("#addiou").click(function () {
 	console.log("Calling add_IOU")
     add_IOU($("#creditor").val(), $("#amount").val()).then(async (response) => {
-
-		console.log("Waiting 5s");
-
-		await delay(5000);
-		
+		//console.log("Waiting 5s");
+		//await delay(5000);
 		window.location.reload(false);
     });
 });
-
-
-function timeConverter(UNIX_timestamp) {
-    var a = new Date(UNIX_timestamp * 1000);
-    var year = a.getFullYear();
-    var month = ('0' + (a.getMonth() + 1)).slice(-2);
-    var date = ('0' + a.getDate()).slice(-2);
-    var hour = ('0' + a.getHours()).slice(-2);
-    var min = ('0' + a.getMinutes()).slice(-2);
-    var sec = ('0' + a.getSeconds()).slice(-2);
-    var time = year + '-' + month + '-' + date + ' ' + hour + ':' + min + ':' + sec;
-    return time;
-}
