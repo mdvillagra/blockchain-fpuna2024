@@ -74,9 +74,6 @@ continuación.
 
 
 
-
-
-
 RESOLUCION DE BUCLES DE DEUDAS
 Es útil pensar en los pagarés como un grafo de deudas. Es decir, cada usuario es un
 nodo, y cada borde dirigido ponderado de A a B con peso X representa el hecho de

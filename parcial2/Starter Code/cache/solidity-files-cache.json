@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/mrvoid/Escritorio/blockchain-fpuna2024/parcial2/Starter Code/contracts/mycontract.sol": {
-      "lastModificationDate": 1718940524364,
-      "contentHash": "f528cc48b962772352c5d85d15800deb",
+      "lastModificationDate": 1719246225825,
+      "contentHash": "95117659551611d7ded4cc62758d00f1",
       "sourceName": "contracts/mycontract.sol",
       "solcConfig": {
         "version": "0.8.17",
