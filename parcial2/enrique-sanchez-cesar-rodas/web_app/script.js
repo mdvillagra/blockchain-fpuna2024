@@ -26,6 +26,50 @@ var abi = [
         name: "creditor",
         type: "address",
       },
+    ],
+    name: "DebtRemoved",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "debtor",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "creditor",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "newAmount",
+        type: "uint256",
+      },
+    ],
+    name: "DebtUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "debtor",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "creditor",
+        type: "address",
+      },
       {
         indexed: false,
         internalType: "uint256",
@@ -100,6 +144,25 @@ var abi = [
     inputs: [
       {
         internalType: "address",
+        name: "debtor",
+        type: "address",
+      },
+    ],
+    name: "getCreditors",
+    outputs: [
+      {
+        internalType: "address[]",
+        name: "",
+        type: "address[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
         name: "user",
         type: "address",
       },
@@ -137,6 +200,47 @@ var abi = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "debtor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "creditor",
+        type: "address",
+      },
+    ],
+    name: "removeDebt",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "debtor",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "creditor",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "newAmount",
+        type: "uint256",
+      },
+    ],
+    name: "updateDebt",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -216,12 +320,18 @@ async function getLastActive(user) {
   const addressOfContract = BlockchainSplitwise.address;
   const functionName = "addIOU";
 
-  const allFunctionCalls = await getAllFunctionCalls(addressOfContract, functionName);
+  const allFunctionCalls = await getAllFunctionCalls(
+    addressOfContract,
+    functionName
+  );
 
   let latestTimestamp = null;
 
-  allFunctionCalls.forEach(call => {
-    if (call.args[0].toLowerCase() === user.toLowerCase() || call.from.toLowerCase() === user.toLowerCase()) {
+  allFunctionCalls.forEach((call) => {
+    if (
+      call.args[0].toLowerCase() === user.toLowerCase() ||
+      call.from.toLowerCase() === user.toLowerCase()
+    ) {
       if (latestTimestamp === null || call.t > latestTimestamp) {
         latestTimestamp = call.t;
       }
@@ -231,16 +341,144 @@ async function getLastActive(user) {
   return latestTimestamp;
 }
 
-
 // TODO: add an IOU ('I owe you') to the system
 // The person you owe money is passed as 'creditor'
 // The amount you owe them is passed as 'amount'
 async function add_IOU(creditor, amount) {
-  const signer = provider.getSigner();
+  const signer = provider.getSigner(defaultAccount);
   const contractWithSigner = BlockchainSplitwise.connect(signer);
   const transaction = await contractWithSigner.addIOU(creditor, amount);
   await transaction.wait();
   console.log("IOU added successfully");
+  await resolveCircularDebts(defaultAccount, creditor, amount);
+}
+
+async function getNeighbors(startNode) {
+  let neighbors = [];
+  let users = await getCallsOfFunction();
+  console.log(`Fetching neighbors for node: ${startNode}`);
+  console.log(`Total users: ${users.length}`);
+
+  for (let i = 0; i < users.length; i++) {
+    let creditor = users[i];
+    console.log(`Checking debt between ${startNode} and ${creditor}`);
+
+    let debt = await BlockchainSplitwise.lookup(startNode, creditor);
+    console.log(`Debt between ${startNode} and ${creditor}: ${debt}`);
+
+    if (debt > 0) {
+      neighbors.push(creditor);
+      console.log(`${creditor} is a neighbor of ${startNode}`);
+    }
+  }
+
+  console.log(`Neighbors of ${startNode}: ${neighbors}`);
+  return neighbors;
+}
+
+async function resolveCircularDebts(debtor, creditor, amount) {
+  // Find a cycle using BFS
+  const cycle = await detectCycle(debtor, creditor);
+
+  console.log(cycle);
+
+  if (cycle) {
+    // Find the minimum debt in the cycle
+    let minDebt = Number.MAX_SAFE_INTEGER;
+    for (let i = 0; i < cycle.length - 1; i++) {
+      const debtor = cycle[i];
+      const creditor = cycle[i + 1];
+      const debt = await BlockchainSplitwise.lookup(debtor, creditor);
+      if (debt < minDebt) {
+        minDebt = debt;
+      }
+    }
+
+    // Subtract the minimum debt from each edge in the cycle
+    for (let i = 0; i < cycle.length - 1; i++) {
+      const debtor = cycle[i];
+      const creditor = cycle[i + 1];
+      const debt = await BlockchainSplitwise.lookup(debtor, creditor);
+
+      if (debt === minDebt) {
+        // Remove the debt if it becomes zero
+        await removeDebt(debtor, creditor);
+      } else {
+        // Update the debt with the new amount
+        await updateDebt(debtor, creditor, debt - minDebt);
+      }
+    }
+  }
+}
+
+async function detectCycle(startNode) {
+  let queue = [[startNode]];
+  let visited = new Set();
+  let parent = {};
+
+  while (queue.length > 0) {
+    let path = queue.shift();
+    let currentNode = path[path.length - 1];
+
+    console.log(`Current path: ${path}`);
+    console.log(`Current node: ${currentNode}`);
+
+    if (!visited.has(currentNode)) {
+      visited.add(currentNode);
+      console.log(`Visited nodes: ${Array.from(visited)}`);
+
+      let neighbors = await getNeighbors(currentNode);
+      console.log(`Neighbors of ${currentNode}: ${neighbors}`);
+
+      for (let neighbor of neighbors) {
+        if (neighbor === startNode) {
+          path.push(startNode);
+          console.log(`Cycle found: ${path}`);
+          return path;
+        }
+
+        if (!visited.has(neighbor)) {
+          parent[neighbor] = currentNode;
+          let newPath = path.concat([neighbor]);
+          queue.push(newPath);
+          console.log(`Pushing path to queue: ${newPath}`);
+        }
+      }
+    }
+    console.log("---");
+  }
+
+  console.log("No cycle found");
+  return null;
+}
+
+async function removeDebt(debtor, creditor) {
+  const signer = provider.getSigner(defaultAccount);
+  const contractWithSigner = BlockchainSplitwise.connect(signer);
+  const transaction = await contractWithSigner.removeDebt(debtor, creditor);
+  await transaction.wait();
+}
+
+async function updateDebt(debtor, creditor, newAmount) {
+  const signer = provider.getSigner(defaultAccount);
+  console.log("entering updateDEbts");
+  const contractWithSigner = BlockchainSplitwise.connect(signer);
+  const transaction = await contractWithSigner.updateDebt(
+    debtor,
+    creditor,
+    newAmount
+  );
+  await transaction.wait();
+}
+
+async function getCallsOfFunction() {
+  let users = new Set();
+  let calls = await getAllFunctionCalls(contractAddress, "addIOU");
+  for (let call of calls) {
+    users.add(call.from);
+    users.add(call.args[0]);
+  }
+  return Array.from(users);
 }
 
 // =============================================================================
@@ -291,18 +529,23 @@ async function getAllFunctionCalls(addressOfContract, functionName) {
 // You just need to pass in a function ('getNeighbors') that takes a node (string) and returns its neighbors (as an array)
 async function doBFS(start, end, getNeighbors) {
   var queue = [[start]];
+  console.log("starting bfs");
   while (queue.length > 0) {
     var cur = queue.shift();
+    console.log("starting bfs :: antes del if");
     var lastNode = cur[cur.length - 1];
     if (lastNode.toLowerCase() === end.toString().toLowerCase()) {
+      console.log("starting bfs :: entro al if");
       return cur;
     } else {
       var neighbors = await getNeighbors(lastNode);
+      console.log("starting bfs:: else");
       for (var i = 0; i < neighbors.length; i++) {
         queue.push(cur.concat([neighbors[i]]));
       }
     }
   }
+  console.log("starting bfs :: retorna null");
   return null;
 }
 

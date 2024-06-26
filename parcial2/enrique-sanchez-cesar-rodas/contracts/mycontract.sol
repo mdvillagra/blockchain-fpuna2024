@@ -17,10 +17,10 @@ contract Splitwise {
     
     mapping(address => bool) public userExists;
 
-    
     event IOUAdded(address indexed debtor, address indexed creditor, uint256 amount);
+    event DebtRemoved(address indexed debtor, address indexed creditor);
+    event DebtUpdated(address indexed debtor, address indexed creditor, uint256 newAmount);
 
-    
     function lookup(address debtor, address creditor) public view returns (uint256 ret) {
         for (uint i = 0; i < debts[debtor].length; i++) {
             if (debts[debtor][i].creditor == creditor) {
@@ -29,7 +29,6 @@ contract Splitwise {
         }
         return 0;
     }
-    
     
     function addIOU(address creditor, uint256 amount) public {
         require(msg.sender != creditor, "You cannot owe yourself");
@@ -46,44 +45,38 @@ contract Splitwise {
         }
         
         emit IOUAdded(msg.sender, creditor, amount);
-        
-        resolveDebts(msg.sender);
     }
     
-    function resolveDebts(address debtor) internal {
+    function getCreditors(address debtor) public view returns (address[] memory) {
+        uint length = debts[debtor].length;
+        address[] memory creditors = new address[](length);
+        for (uint i = 0; i < length; i++) {
+            creditors[i] = debts[debtor][i].creditor;
+        }
+        return creditors;
+    }
+
+    function removeDebt(address debtor, address creditor) public {
         for (uint i = 0; i < debts[debtor].length; i++) {
-            address creditor = debts[debtor][i].creditor;
-            uint256 amount = debts[debtor][i].amount;
-            
-            for (uint j = 0; j < debts[creditor].length; j++) {
-                if (debts[creditor][j].creditor == debtor) {
-                    uint256 creditorAmount = debts[creditor][j].amount;
-                    if (amount == creditorAmount) {
-                        removeDebt(debtor, i);
-                        removeDebt(creditor, j);
-                        return;
-                    } else if (amount > creditorAmount) {
-                        debts[debtor][i].amount -= creditorAmount;
-                        removeDebt(creditor, j);
-                        return;
-                    } else {
-                        debts[creditor][j].amount -= amount;
-                        removeDebt(debtor, i);
-                        return;
-                    }
-                }
+            if (debts[debtor][i].creditor == creditor) {
+                debts[debtor][i] = debts[debtor][debts[debtor].length - 1];
+                debts[debtor].pop();
+                emit DebtRemoved(debtor, creditor);
+                break;
             }
         }
     }
 
-    function removeDebt(address debtor, uint index) internal {
-        uint lastIndex = debts[debtor].length - 1;
-        if (index != lastIndex) {
-            debts[debtor][index] = debts[debtor][lastIndex];
+    function updateDebt(address debtor, address creditor, uint256 newAmount) public {
+        for (uint i = 0; i < debts[debtor].length; i++) {
+            if (debts[debtor][i].creditor == creditor) {
+                debts[debtor][i].amount = newAmount;
+                emit DebtUpdated(debtor, creditor, newAmount);
+                break;
+            }
         }
-        debts[debtor].pop();
     }
-    
+
     function getAllUsers() public view returns (address[] memory) {
         return users;
     }
