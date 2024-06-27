@@ -109,6 +109,30 @@ var abi = [
 		],
 		"stateMutability": "view",
 		"type": "function"
+	  },
+	  {
+		"inputs": [
+		  {
+			"internalType": "address",
+			"name": "deudor",
+			"type": "address"
+		  },
+		  {
+			"internalType": "address",
+			"name": "acreedor",
+			"type": "address"
+		  }
+		],
+		"name": "lookup",
+		"outputs": [
+		  {
+			"internalType": "uint256",
+			"name": "",
+			"type": "uint256"
+		  }
+		],
+		"stateMutability": "view",
+		"type": "function"
 	  }
   ]; // FIXME: fill this in with your contract's ABI //Be sure to only have one array, not two
 // ============================================================
@@ -148,6 +172,10 @@ async function getTotalOwed(user) {
 // HINT: Try looking at the way 'getAllFunctionCalls' is written. You can modify it if you'd like.
 async function getLastActive(user) {
 	return await BlockchainSplitwise.getLastActive(user)
+}
+
+async function lookUp(deudor, acreedor) {
+	return await BlockchainSplitwise.lookup(deudor, acreedor)
 }
 
 // TODO: add an IOU ('I owe you') to the system
@@ -238,8 +266,13 @@ provider.listAccounts().then((response)=> {
 // This code updates the 'My Account' UI with the results of your functions
 $("#myaccount").change(function() {
 	defaultAccount = $(this).val();
+	creditorAccount = $("#creditor").val();
 
 	getTotalOwed(defaultAccount).then((response)=>{
+		$("#total_owed").html("$"+response);
+	})
+
+	lookUp(defaultAccount).then((response)=>{
 		$("#total_owed").html("$"+response);
 	})
 
@@ -251,17 +284,28 @@ $("#myaccount").change(function() {
 	getUsers().then((response)=>{
 		$("#all_users").html(response.map(function (u) { return "<li>"+u+"</li>" }));
 	});
+
+	lookUp(defaultAccount, creditorAccount).then((response)=>{
+		$("#lookup").html(response+"$");
+	});
 });
 
 $("#creditor").change(function() {
-	defaultAccount = $(this).val();
+	creditorAccount = $(this).val();
+	defaultAccount = $("#myaccount").val();
 
+	lookUp(defaultAccount, creditorAccount).then((response)=>{
+		$("#lookup").html(response+"$");
+	})
+	
 });
 
 // Allows switching between accounts in 'My Account' and the 'fast-copy' in 'Address of person you owe
 provider.listAccounts().then((response)=>{
 	var opts = response.map(function (a) { return '<option value="'+
 			a.toLowerCase()+'">'+a.toLowerCase()+'</option>' });
+	opts.unshift('<option value="" selected disabled hidden>Choose here</option>	')
+	console.log(opts);
 	$(".account").html(opts);
 	$(".creditor").html(opts);
 	$(".wallet_addresses").html(response.map(function (a) { return '<li>'+a.toLowerCase()+'</li>' }));
@@ -271,11 +315,21 @@ getUsers().then((response)=>{
 	$("#all_users").html(response.map(function (u) { return "<li>"+u+"</li>" }));
 });
 
+lookUp($("#myaccount").val(), $("#creditor").val()).then((response)=>{
+	$("#lookup").html(response+"$");
+})
+
 // This runs the 'add_IOU' function when you click the button
 // It passes the values from the two inputs above
 $("#addiou").click(function() {
 	defaultAccount = $("#myaccount").val(); //sets the default account
+	creditorAccount = $("#creditor").val();
 	add_IOU($("#creditor").val(), $("#amount").val(), defaultAccount)
+
+	getUsers().then((response)=>{
+		$("#all_users").html(response.map(function (u) { return "<li>"+u+"</li>" }));
+	});
+	$("#amount").val('')
 
 	getTotalOwed(defaultAccount).then((response)=>{
 		$("#total_owed").html("$"+response);
@@ -286,10 +340,9 @@ $("#addiou").click(function() {
 		$("#last_active").html(time)
 	});
 
-	getUsers().then((response)=>{
-		$("#all_users").html(response.map(function (u) { return "<li>"+u+"</li>" }));
-	});
-	$("#amount").val('')
+	lookUp(defaultAccount, creditorAccount).then((response)=>{
+		$("#lookup").html(response+"$");
+	})
 });
 
 // This is a log function, provided if you want to display things to the page instead of the JavaScript console
