@@ -81,23 +81,28 @@ var abi = [
     type: "event",
   },
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "creditor",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-    ],
-    name: "addIOU",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "creditor",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "path",
+				"type": "address[]"
+			}
+		],
+		"name": "addIOU",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
   {
     inputs: [
       {
@@ -345,12 +350,14 @@ async function getLastActive(user) {
 // The person you owe money is passed as 'creditor'
 // The amount you owe them is passed as 'amount'
 async function add_IOU(creditor, amount) {
-  const signer = provider.getSigner(defaultAccount);
-  const contractWithSigner = BlockchainSplitwise.connect(signer);
-  const transaction = await contractWithSigner.addIOU(creditor, amount);
-  await transaction.wait();
-  console.log("IOU added successfully");
-  await resolveCircularDebts(defaultAccount, creditor, amount);
+	path = await doBFS(creditor, defaultAccount, getNeighbors);
+	if (path == null) path = [];
+
+	try {
+		await BlockchainSplitwise.connect(provider.getSigner(defaultAccount)).addIOU(creditor, amount, path);
+	} catch (error) {
+		console.log('Error adding the IOU');
+	}
 }
 
 async function getNeighbors(startNode) {
