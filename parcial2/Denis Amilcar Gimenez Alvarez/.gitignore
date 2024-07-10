@@ -1,0 +1,12 @@
+# Ignorar carpetas de node_modules
+node_modules/
+
+# Ignorar carpeta .devcontainer
+.devcontainer/
+
+# Ignorar otras carpetas no útiles para el proyecto
+cache/
+artifacts/
+
+package-lock.json
+package.json
