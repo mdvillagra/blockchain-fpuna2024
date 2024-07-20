@@ -1,0 +1,7 @@
+{
+    "name": "Hardhat Dev Container",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "hardhat",
+    "workspaceFolder": "/usr/src/app"
+}
+  
