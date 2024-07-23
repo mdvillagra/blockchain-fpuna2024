@@ -1,0 +1,174 @@
+/* style.css
+   Defines the style for StanDex Exchange
+*/
+
+/* General body styling */
+body {
+    font-family: 'Source Sans Pro', 'Arial', sans-serif;
+    background-color: #f0f2f5;
+    padding: 30px;
+    margin: 0;
+    color: #333;
+}
+
+/* Header styles */
+#header {
+    background-color: #2c3e50;
+    padding: 20px;
+    color: white;
+    text-align: center;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+#header h1 {
+    font-size: 2.5em;
+    margin: 0;
+}
+
+#header h2 {
+    font-size: 1.5em;
+    margin-top: 10px;
+    color: #ecf0f1;
+}
+
+/* Account selector styles */
+#account-selector {
+    background-color: #ecf0f1;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    width: calc(100% - 40px);
+    margin: 0 auto 20px auto;
+}
+
+#account-selector label {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+#account-selector select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #bdc3c7;
+    border-radius: 5px;
+}
+
+/* Main content styles */
+#main {
+    margin: 0 auto;
+    width: 60%;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+#main h1 {
+    font-size: 2em;
+    margin-bottom: 20px;
+}
+
+#main-display article {
+    margin-bottom: 20px;
+}
+
+#rate-display, #liquidity-display, #swap-control, #liquidity-control {
+    margin-bottom: 20px;
+}
+
+/* Display sections styles */
+#rate-display h1, #liquidity-display h1 {
+    font-size: 1.5em;
+    margin-bottom: 10px;
+}
+
+#rate-display h3, #liquidity-display h3 {
+    font-size: 1.2em;
+    margin-bottom: 5px;
+}
+
+/* Swap control styles */
+#swap-control-title, .liquidity-control-title {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #bdc3c7;
+    border-radius: 5px;
+}
+
+/* Button styles */
+button {
+    display: block;
+    width: calc(100% - 40px);
+    margin: 10px 20px;
+    padding: 15px 30px;
+    border: 1px solid #7f8c8d;
+    background: linear-gradient(to right, #74ebd5, #acb6e5);
+    border-radius: 5px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.3s, border-color 0.3s;
+    color: white;
+}
+
+button:hover {
+    background: linear-gradient(to right, #acb6e5, #74ebd5);
+    border-color: #95a5a6;
+}
+
+/* Log styles */
+#log {
+    background: #2c3e50;
+    color: white;
+    padding: 20px;
+    border-radius: 5px;
+    font-family: monospace;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Wallet address panel styles */
+.wallet_addresses_panel {
+    position: fixed;
+    width: 300px;
+    height: 160px;
+    background-color: #ecf0f1;
+    padding: 20px;
+    bottom: 10px;
+    right: 10px;
+    font-size: 10px;
+    opacity: 0.9;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .panel {
+        position: static;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    #main {
+        width: 100%;
+        padding: 10px;
+    }
+
+    button {
+        width: calc(100% - 20px);
+        margin: 10px;
+    }
+}
