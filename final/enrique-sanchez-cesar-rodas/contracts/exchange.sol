@@ -11,7 +11,7 @@ contract TokenExchange is Ownable {
 
     // TODO: paste token contract address here
     // e.g. tokenAddr = 0x5FbDB2315678afecb367f032d93F642f64180aa3
-    address tokenAddr;                                  // TODO: paste token contract address here
+    address tokenAddr = 0x5FbDB2315678afecb367f032d93F642f64180aa3;                                  // TODO: paste token contract address here
     Token public token = Token(tokenAddr);                                
 
     // Liquidity pool for the exchange
