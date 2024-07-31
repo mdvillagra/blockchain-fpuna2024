@@ -7,7 +7,7 @@ import "hardhat/console.sol";
 
 
 contract TokenExchange is Ownable {
-    string public exchange_name = '';
+    string public exchange_name = 'exchange';
 
     // TODO: paste token contract address here
     // e.g. tokenAddr = 0x5FbDB2315678afecb367f032d93F642f64180aa3
@@ -102,12 +102,39 @@ contract TokenExchange is Ownable {
 
     // Function addLiquidity: Adds liquidity given a supply of ETH (sent to the contract as msg.value).
     // You can change the inputs, or the scope of your function, as needed.
-    function addLiquidity() 
-        external 
-        payable
-    {
-       /******* TODO: Implement this function *******/
-    }
+    function addLiquidity() external payable {
+    uint256 eth_amount = msg.value;
+
+    // Ensure the ETH amount is greater than zero
+    require(eth_amount > 0, "Must receive at least one ETH");
+
+    // Calculate the required amount of tokens
+    uint256 token_amount = (eth_amount * token_reserves) / eth_reserves;
+
+    // Ensure the token amount is greater than zero
+    require(token_amount > 0, "Must receive at least one token");
+
+    // Transfer the tokens from the sender to the contract
+    require(token.transferFrom(msg.sender, address(this), token_amount), "Token transfer failed");
+
+    // Update the reserves
+    token_reserves += token_amount;
+    eth_reserves += eth_amount;
+    
+    // Update the constant product
+    k = token_reserves * eth_reserves;
+
+    // Calculate the shares for the liquidity provider
+    uint256 shares = (eth_amount * total_shares) / eth_reserves;
+
+    // Update the liquidity provider's shares and the total shares
+    lps[msg.sender] += shares;
+    total_shares += shares;
+
+    // Record the liquidity provider
+    lp_providers.push(msg.sender);
+}
+
 
 
     // Function removeLiquidity: Removes liquidity given the desired amount of ETH to remove.
@@ -116,7 +143,40 @@ contract TokenExchange is Ownable {
         public 
         payable
     {
-        /******* TODO: Implement this function *******/
+            // Calculate the amount of tokens to be removed based on the ETH amount
+        uint256 amountTokens = (amountETH * token_reserves) / eth_reserves;
+        
+        // Calculate the shares to be removed
+        uint256 shares = (amountETH * total_shares) / eth_reserves;
+
+        // Ensure the user has enough shares to remove the liquidity
+        require(lps[msg.sender] >= shares, "Not enough shares");
+        // Ensure the amount of tokens to be removed is valid
+        require(amountTokens > 0, "Must remove at least one token");
+
+        // Ensure the contract has enough tokens and ETH to fulfill the removal
+        uint256 new_tok_pool = token_reserves - amountTokens;
+        require(new_tok_pool > 0, "Not enough tokens in the contract");
+        uint256 new_ETH_pool = eth_reserves - amountETH;
+        require(new_ETH_pool > 0, "Not enough ETH in the contract");
+
+        // Transfer the tokens to the user
+        require(token.transfer(msg.sender, amountTokens), "Token transfer failed");
+
+        // Transfer the ETH to the user
+        (bool success, ) = msg.sender.call{value: amountETH}("");
+        require(success, "ETH transfer failed");
+
+        // Update the reserves
+        token_reserves = new_tok_pool;
+        eth_reserves = new_ETH_pool;
+
+        // Update the constant product
+        k = token_reserves * eth_reserves;
+
+        // Update the liquidity provider's shares and the total shares
+        lps[msg.sender] -= shares;
+        total_shares -= shares;
     }
 
     // Function removeAllLiquidity: Removes all liquidity that msg.sender is entitled to withdraw
@@ -125,7 +185,34 @@ contract TokenExchange is Ownable {
         external
         payable
     {
-        /******* TODO: Implement this function *******/
+        uint shares = lps[msg.sender];
+    
+        // Ensure the user has provided liquidity
+        require(shares > 0, "No liquidity provided");
+
+        // Calculate the amount of ETH and tokens to be removed
+        uint amountETH = (shares * eth_reserves) / total_shares;
+        uint token_amount = (shares * token_reserves) / total_shares;
+
+        // Ensure the new token and ETH pools will be positive
+        uint new_tok_pool = token_reserves - token_amount;
+        require(new_tok_pool > 0, "Not enough tokens in the contract");
+        uint new_ETH_pool = eth_reserves - amountETH;
+        require(new_ETH_pool > 0, "Not enough ETH in the contract");
+
+        // Transfer the tokens to the user
+        require(token.transfer(msg.sender, token_amount), "Token transfer failed");
+
+        // Transfer the ETH to the user
+        (bool success, ) = msg.sender.call{value: amountETH}("");
+        require(success, "ETH transfer failed");
+
+        // Update the reserves and shares
+        token_reserves = new_tok_pool;
+        eth_reserves = new_ETH_pool;
+        k = token_reserves * eth_reserves;
+        total_shares -= shares;
+        lps[msg.sender] = 0;
     }
     /***  Define additional functions for liquidity fees here as needed ***/
 
@@ -138,7 +225,29 @@ contract TokenExchange is Ownable {
         external 
         payable
     {
-        /******* TODO: Implement this function *******/
+            // Ensure the pool reserves are initialized
+        require(eth_reserves > 0 && token_reserves > 0, "Pool reserves must be initialized");
+
+        // Calculate the amount of ETH to be swapped based on the token amount
+        uint256 amountETH = (amountTokens * eth_reserves) / token_reserves;
+
+        // Ensure the amount of ETH to be swapped is within valid bounds
+        require(amountETH > 0, "Must swap at least one token's worth of ETH");
+        require(amountETH < eth_reserves, "Not enough ETH in the contract");
+
+        // Transfer the tokens from the user to the contract
+        require(token.transferFrom(msg.sender, address(this), amountTokens), "Token transfer failed");
+
+        // Transfer the ETH to the user
+        (bool success, ) = msg.sender.call{value: amountETH}("");
+        require(success, "ETH transfer failed");
+
+        // Update the reserves
+        token_reserves += amountTokens;
+        eth_reserves -= amountETH;
+
+        // Update the constant product
+        k = token_reserves * eth_reserves;
     }
 
 
@@ -150,6 +259,25 @@ contract TokenExchange is Ownable {
         external
         payable 
     {
-        /******* TODO: Implement this function *******/
+            // Ensure the pool reserves are initialized
+        require(eth_reserves > 0 && token_reserves > 0, "Pool reserves must be initialized");
+
+        // Calculate the amount of tokens to be swapped based on the ETH amount
+        uint256 eth_amount = msg.value;
+        uint256 token_amount = (eth_amount * token_reserves) / eth_reserves;
+
+        // Ensure the token amount is within valid bounds
+        require(token_amount > 0, "Must receive at least one token");
+        require(token_amount < token_reserves, "Not enough tokens in the contract");
+
+        // Transfer the tokens to the user
+        require(token.transfer(msg.sender, token_amount), "Token transfer failed");
+
+        // Update the reserves
+        token_reserves -= token_amount;
+        eth_reserves += eth_amount;
+
+        // Update the constant product
+        k = token_reserves * eth_reserves;
     }
 }
